@@ -33,7 +33,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
     3) computes spectrograms from audio files.
     """
 
-    def __init__(self, audiopaths_and_text, hparams):
+    def __init__(self, audiopaths_and_text, hparams, device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.hparams = hparams
         self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text)
         self.text_cleaners = hparams.text_cleaners
@@ -59,14 +59,15 @@ class TextAudioLoader(torch.utils.data.Dataset):
         random.shuffle(self.audiopaths_and_text)
         self._filter()
         #New IndicBERTProcessor Stuff
-        #print(f"Initializing IndicBERTProcessor on device: {device}")
+        print(f"Initializing IndicBERTProcessor on device: {device}")
+        self.device = device
 
         # 1. Load IndicBERT Tokenizer and Model from Hugging Face
         # This model is pre-trained on 12 major Indian languages and is ideal for
         # generating rich, context-aware embeddings.
         print(f"Loading IndicBERT model: {INDIC_BERT_MODEL_NAME}")
         self.tokenizer = AutoTokenizer.from_pretrained(INDIC_BERT_MODEL_NAME)
-        self.model = AutoModel.from_pretrained(INDIC_BERT_MODEL_NAME)
+        self.model = AutoModel.from_pretrained(INDIC_BERT_MODEL_NAME).to(self.device)
         self.model.eval()  # Set the model to evaluation mode
         print("IndicBERT model and tokenizer loaded successfully.")
 
@@ -81,7 +82,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
         # typically expects a smaller dimension (e.g., 192 or 256). This linear
         # layer bridges that gap.
         bert_hidden_dim = self.model.config.hidden_size # Should be 768
-        self.projection = torch.nn.Linear(bert_hidden_dim, VITS2_HIDDEN_DIM)
+        self.projection = torch.nn.Linear(bert_hidden_dim, VITS2_HIDDEN_DIM).to(self.device)
 
     def _get_normalizer(self, lang_code):
         """
